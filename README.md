@@ -23,6 +23,10 @@ Also used Platform IO plugin.
 * 2 relay switches 
 * Custom built clamp sensor
 
+## Demo Video
+
+[![here](https://img.youtube.com/vi/DF79dDL9Vik/0.jpg)](https://www.youtube.com/watch?v=DF79dDL9Vik)
+
 ## Disclamer 
 
 There should be unit tests in this code. Using this code is done on your own risk!

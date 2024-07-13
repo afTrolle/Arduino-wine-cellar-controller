@@ -6,7 +6,6 @@
 //DEBUG IF
 
 //#define DEBUG
-//#define DEBUG_WEATHER
 
 #ifdef DEBUG
 #include <SPI.h>

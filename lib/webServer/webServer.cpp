@@ -19,14 +19,7 @@
 
 
 const static char  http_get[] PROGMEM  = "GET";
-const static char http_head[] PROGMEM = "HEAD";
 const static char http_post[] PROGMEM = "POST";
-const static char http_put[] PROGMEM  = "PUT";
-const static char http_delete[] PROGMEM = "DELETE";
-const static char http_connect[] PROGMEM = "CONNECT";
-const static char http_options[] PROGMEM = "OPTIONS";
-const static char http_trace[] PROGMEM  = "TRACE";
-const static char http_patch[] PROGMEM = "PATCH";
 
 const static char http_one_one_ver[] PROGMEM = "HTTP/1.1";
 const static char http_one_zero[] PROGMEM = "HTTP/1.0";
@@ -94,7 +87,7 @@ void readRequestLine(EthernetClient * client,	struct httpRequest * request )
 	//if error reading first line
 	if (numBytesRead == 0){
 		//error reading first line
-		request->http_error_progmem_pointer =	(char *) http_response_bad_Request;
+		request->http_error_progmem_pointer = (char *) http_response_bad_Request;
 		return;
 	}
 

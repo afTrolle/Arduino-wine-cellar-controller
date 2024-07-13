@@ -3,8 +3,14 @@
 void initServer();
 void loopServer();
 
-void door_relay_tick(bool is_door_triggered);
-bool relay_action(bool too_open, bool force);
+void init_weather_sensor();
+void loop_weather_sensor();
+
+unsigned long weather_read_millis = 0;
+float weather_relative_humidity = -1; 
+float weather_temperature = -1;
+
+DHT_Unified dht(DHTPIN, DHTTYPE);
 
 #ifdef DEBUG
 const static int SerialFrequency = 9600;
@@ -25,24 +31,16 @@ void setup()
   initSerial();
 #endif
   init_relay();
-  init_clamp();
+  init_weather_sensor();
   initServer();
-  init_weather();
-  initSD();
 }
 
 void loop()
 {
-
   //updates trip Sensor
-
-  door_relay_tick(read_sensor());
+  loop_weather_sensor();
   loopServer();
-
-  door_relay_tick(read_sensor());
-
-  //updates trip Sensor
-  weather_tick();
+  door_relay_tick();
 }
 
 // WebServer
@@ -52,6 +50,7 @@ EthernetServer server(80);
 
 void initServer()
 {
+  DEBUG_PRINTCT("starting server");
   unsigned char state = Ethernet.begin(MAC_ADDRESS);
 
   // if DHCP failed
@@ -84,141 +83,64 @@ void handleRequest(struct httpRequest *request, EthernetClient *client)
     DEBUG_PRINT(F("GET called: "));
     DEBUG_PRINTLN(request->path);
 
-    if (strncmp_P(request->path, weatherPath, strlen_P(weatherPath)) == 0)
+    if (strcmp_P(request->path, weather_str) == 0)
     {
-      print_http_repsonse(client, request, (char *)http_response_ok);
-      print_header(client, F("Content-Type: application/json\r\n"));
-      print_header(client, F("Transfer-Encoding: identity\r\n"));
-      print_header(client, F("Access-Control-Allow-Origin: *\r\n"));
-      print_end_of_header(client);
-      client->print(F("{\n\"temperature\":"));
-      client->print(current_temperature);
-      client->print(F("\n,\"humidity\": "));
-      client->print(current_humdidity);
-      client->print(F("\n}"));
-    }
-    else if (strncmp_P(request->path, door_sensor, strlen_P(door_sensor)) == 0)
-    {
-      //Get door sensor data
-      print_http_repsonse(client, request, (char *)http_response_ok);
-      print_header(client, F("Content-Type: application/json\r\n"));
-      print_header(client, F("Transfer-Encoding: identity\r\n"));
-      print_header(client, F("Access-Control-Allow-Origin: *\r\n"));
-      print_end_of_header(client);
-      client->print(F("["));
+        print_http_repsonse(client, request, (char *)http_response_ok);
+        print_header(client, F("Content-Type: application/json\r\n"));
+        print_header(client, F("Transfer-Encoding: identity\r\n"));
+        print_header(client, F("Access-Control-Allow-Origin: *\r\n"));
+        print_header(client, F("Access-Control-Allow-Methods: * \r\n"));
+        print_end_of_header(client);
 
-      int *clamp_sensor_data = get_clamp_readings();
-      for (int i = 0; i < (SAMPLE_SIZE - 2); i++)
-      {
-        client->print(clamp_sensor_data[i], 10);
-        client->print(F(","));
-      }
-      client->print(clamp_sensor_data[SAMPLE_SIZE - 1]);
-
-      client->print(F("]"));
+        client->print(F("{\n\"temperature\":"));
+        client->print(weather_temperature);
+        client->print(F("\n,\"humidity\": "));
+        client->print(weather_relative_humidity);
+        client->print(F("\n}"));
     }
-    else if (strcmp_P(request->path, indexPath) == 0)
+      else
     {
-      //SEND INDEX.html
-      printFile(F("/index.htm"), client, request);
-    }
-    else if (strchr(request->path, '.') == NULL)
-    {
-      int newbuff = strlen(request->path);
-      char charbuff[newbuff + LENGTH(addition)];
-      strcpy(charbuff, request->path);
-      strcat_P(charbuff, addition);
-      printFile(charbuff, client, request);
-    }
-    else
-    {
-      printFile(request->path, client, request);
+      print_http_repsonse(client, request, (char *)http_response_not_found);
+      print_end_of_header(client);
     }
   }
-  else if (request->method == http_method::POST)
+   else if (request->method == http_method::POST)
   {
     DEBUG_PRINT(F("POST called: "));
     DEBUG_PRINTLN(request->path);
+
     if (strcmp_P(request->path, open_relaystr) == 0)
     {
       print_http_repsonse(client, request, (char *)http_response_ok);
       print_header(client, F("Access-Control-Allow-Origin: * \r\n"));
+      print_header(client, F("Access-Control-Allow-Methods: * \r\n"));
       print_end_of_header(client);
 
-      if (is_triggered == false)
+      bool state = relay_action(true);
+      if (state)
       {
-        const boolean success = relay_action(true, false);
-        if (success)
-        {
-          //ok
-          print_header(client, F("{\"status\":200, \"message\":\"ok\"}"));
-        }
-        else
-        {
-          print_header(client, F("{\"status\":300, \"message\":\"door already in use\"}"));
-          //seesion already ongoing
-        }
+        print_header(client, F("{\"status\":200, \"message\":\"ok\"}")); // ok
       }
       else
       {
-        print_header(client, F("{\"status\":400, \"message\":\"Door saftey tripped\"}"));
-        //triped emergerncy
+        print_header(client, F("{\"status\":300, \"message\":\"door already in use\"}")); // seesion already ongoing
       }
     }
     else if (strcmp_P(request->path, close_relaystr) == 0)
     {
       print_http_repsonse(client, request, (char *)http_response_ok);
       print_header(client, F("Access-Control-Allow-Origin: * \r\n"));
+      print_header(client, F("Access-Control-Allow-Methods: * \r\n"));
       print_end_of_header(client);
 
-      if (is_triggered == false)
-      {
-        boolean state = relay_action(false, false);
-        if (state)
-        {
-          print_header(client, F("{\"status\":200, \"message\":\"ok\"}")); //ok
-        }
-        else
-        {
-          print_header(client, F("{\"status\":300, \"message\":\"door already in use\"}")); //seesion already ongoing
-        }
-      }
-      else
-      {
-        print_header(client, F("{\"status\":400, \"message\":\"Door saftey tripped\"}"));
-        //triped emergerncy
-      }
-    }
-    else if (strcmp_P(request->path, force_open_relaystr) == 0)
-    {
-      print_http_repsonse(client, request, (char *)http_response_ok);
-      print_header(client, F("Access-Control-Allow-Origin: * \r\n"));
-      print_end_of_header(client);
-
-      bool state = relay_action(true, true);
+      bool state = relay_action(false);
       if (state)
       {
-        print_header(client, F("{\"status\":200, \"message\":\"ok\"}")); //ok
+        print_header(client, F("{\"status\":200, \"message\":\"ok\"}")); // ok
       }
       else
       {
-        print_header(client, F("{\"status\":300, \"message\":\"door already in use\"}")); //seesion already ongoing
-      }
-    }
-    else if (strcmp_P(request->path, force_close_relaystr) == 0)
-    {
-      print_http_repsonse(client, request, (char *)http_response_ok);
-      print_header(client, F("Access-Control-Allow-Origin: * \r\n"));
-      print_end_of_header(client);
-
-      bool state = relay_action(false, true);
-      if (state)
-      {
-        print_header(client, F("{\"status\":200, \"message\":\"ok\"}")); //ok
-      }
-      else
-      {
-        print_header(client, F("{\"status\":300, \"message\":\"door already in use\"}")); //seesion already ongoing
+        print_header(client, F("{\"status\":300, \"message\":\"door already in use\"}")); //session already ongoing
       }
     }
     else
@@ -242,7 +164,7 @@ void loopServer()
     DEBUG_PRINTLN(request->path);
     if (request->http_error_progmem_pointer != NULL)
     {
-      //if error print error
+      // if error print error
       DEBUG_PRINT("http_error_progmem_pointer is not  NULL");
       print_http_repsonse(&client, request, request->http_error_progmem_pointer);
       print_end_of_header(&client);
@@ -259,67 +181,26 @@ void loopServer()
   }
 }
 
-//milis that force open/close is opened
-#define action_recvied_elpased 600
-bool is_forcing = false;
-unsigned long relay_action_recived_millis = 0;
 
-bool relay_action(bool too_open, bool force)
-{
-  if (is_triggered && !force)
-  {
-    return false;
-  }
-
-  //if already running
-  if (is_power_pin_high)
-  {
-    //same args called as running then update millis
-    if (is_forcing == force && is_open_or_close_pin_open == too_open)
-    {
-      relay_action_recived_millis = millis();
-      return true;
-    }
-  }
-  else
-  {
-    toggle_on_relay(too_open);
-    is_forcing = force;
-    relay_action_recived_millis = millis();
-    return true;
-  }
-  return false;
+void init_weather_sensor() {
+  // Initialize device.
+  dht.begin();
 }
 
-//called as often as possible
-//desides when it is time to stop
-void door_relay_tick(bool is_door_triggered)
-{
-  //Is relay on
-  if (is_power_pin_high)
-  {
-    //Is forcing opening
-    if (is_forcing)
-    {
-      //force recived millies need to be updated
-      if ((millis() - relay_action_recived_millis) > action_recvied_elpased)
-      {
-        toggle_off_relay();
-      }
+void loop_weather_sensor() {
+  unsigned long now = millis();
+  if (weather_read_millis + 10000  < now) {
+    weather_read_millis = now;
+    // Get temperature event and print its value.
+    sensors_event_t event;
+    dht.temperature().getEvent(&event);
+    if (!isnan(event.temperature)) {
+      weather_temperature = event.temperature;
     }
-    else
-    {
-      //not forcing
-      if (is_door_triggered)
-      {
-        //triggered saftey
-        toggle_off_relay();
-      }
-      else if ((millis() - relay_action_recived_millis) > action_recvied_elpased)
-      {
-        //no saftey triggered but stop hasn't recvied too keep going
-        toggle_off_relay();
-      }
+    // Get humidity event and print its value.
+    dht.humidity().getEvent(&event);
+    if (!isnan(event.relative_humidity)) {
+      weather_relative_humidity = event.relative_humidity;
     }
   }
 }

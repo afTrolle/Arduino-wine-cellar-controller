@@ -9,7 +9,7 @@
 #define HTTP_PATH_SIZE 50
 #define HTTP_QUERY_SIZE 50
 
-enum http_method {GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH, UNKNOWN};
+enum http_method {GET,  POST, UNKNOWN};
 enum http_version {ONE_ONE, ONE_ZERO , UN_KNOWN};
 
 const static char PROGMEM http_response_continute[]  = "100 Continue";

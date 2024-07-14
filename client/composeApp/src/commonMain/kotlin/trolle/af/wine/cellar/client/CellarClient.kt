@@ -11,9 +11,10 @@ import io.ktor.client.request.url
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 
-object CellarClient {
+internal object CellarClient {
 
     private val client = HttpClient {
+        expectSuccess = true
         install(HttpTimeout) {
             socketTimeoutMillis = 500
             connectTimeoutMillis = 500
@@ -24,7 +25,7 @@ object CellarClient {
         }
     }
 
-    suspend fun getWeather(url: String?) =
+    internal suspend fun getWeather(url: String?) =
         url?.let {
             client.get {
                 host = url
@@ -32,7 +33,7 @@ object CellarClient {
             }.body<Weather>()
         }
 
-    suspend fun open(url: String?) =
+    internal suspend fun open(url: String?) =
         url?.let {
             client.post {
                 host = url
@@ -40,17 +41,18 @@ object CellarClient {
             }
         }
 
-    suspend fun close(url: String?) =
+    internal suspend fun close(url: String?) =
         url?.let {
             client.post {
                 host = url
                 url("/close")
             }
         }
+
 }
 
 @Serializable
-data class Weather(
+internal data class Weather(
     val temperature: Float? = null,
     val humidity: Float? = null,
 )

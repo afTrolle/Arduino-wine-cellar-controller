@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -41,46 +43,76 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import trolle.af.wine.cellar.client.theme.AppTheme
+import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import lajlas_wine_cellar.composeapp.generated.resources.PC288238
 import lajlas_wine_cellar.composeapp.generated.resources.Res
 import org.jetbrains.compose.resources.imageResource
+import trolle.af.wine.cellar.client.theme.AppTheme
 
 @Composable
 internal fun App() = AppTheme {
 
     var climate: Weather? by remember { mutableStateOf(null) }
+    var error by remember { mutableStateOf(true) }
+
     val url = "192.168.1.117"
 
     LaunchedEffect(Unit) {
-        climate = CellarClient.getWeather(url)
+        try {
+            climate = CellarClient.getWeather(url)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            error = true
+        }
     }
 
     MainScreenLayout(
         climate,
+        error = error,
+        clearError = { error = false },
         whileOpen = {
-            while (isActive) {
-                CellarClient.open(url)
-                delay(350)
-            }
+            iterate(
+                call = { CellarClient.open(url) },
+                onError = { error = true }
+            )
         },
         whileClose = {
-            while (isActive) {
-                CellarClient.close(url)
-                delay(350)
-            }
+            iterate(
+                call = { CellarClient.close(url) },
+                onError = { error = true }
+            )
         }
     )
+}
+
+private suspend inline fun CoroutineScope.iterate(
+    call: () -> Unit,
+    onError: () -> Unit,
+) {
+    try {
+        while (isActive) {
+            call()
+            delay(350)
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Throwable) {
+        onError()
+    }
 }
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreenLayout(
+private fun MainScreenLayout(
     climate: Weather? = null,
+    error: Boolean = false,
+    clearError: () -> Unit = {},
     whileOpen: suspend CoroutineScope.() -> Unit = {},
     whileClose: suspend CoroutineScope.() -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
@@ -91,7 +123,7 @@ fun MainScreenLayout(
     topBar = {
         CenterAlignedTopAppBar(
             title = {
-                Text("Lajlas Vinkällare")
+                Text("Lajlas Vinkällar")
             },
         )
     }
@@ -117,7 +149,6 @@ fun MainScreenLayout(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-
                 ClimateInfo(climate)
                 WineControls(
                     whileOpen = whileOpen,
@@ -125,11 +156,35 @@ fun MainScreenLayout(
                 )
             }
         }
+
+        if (error) {
+            AlertDialog(
+                onDismissRequest = clearError,
+                confirmButton = { Button(onClick = clearError) { Text("ok") } },
+                dismissButton = null,
+                icon = null,
+                title = { Text("Ett fel uppstod") },
+                text = {
+                    Text(
+                        """
+                        Något har gått snett, Försök följande steg:
+                        1. Kolla att du är kopplad till "Villa Trolle" WIFI
+                        2. Starta om dossan i källaren genom att koppla ur nätverks sladden i propskåpet
+                        3. Ring Alex / Kolla router inställningarna ifall dossan dycker up.
+                    """.trimIndent()
+                    )
+                },
+                properties = DialogProperties(
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false,
+                ),
+            )
+        }
     }
 }
 
 @Composable
-fun ClimateInfo(climate: Weather?) = Card(
+private fun ClimateInfo(climate: Weather?) = Card(
     colors = CardDefaults.elevatedCardColors()
 ) {
     Column(
@@ -162,7 +217,7 @@ fun ClimateInfo(climate: Weather?) = Card(
 }
 
 @Composable
-fun ClimateCard(
+private fun ClimateCard(
     modifier: Modifier,
     image: ImageVector,
     text: String,

@@ -6,7 +6,7 @@ import trolle.af.wine.cellar.client.App
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     onWasmReady {
-        CanvasBasedWindow("Lajlas Vinkällare", "ComposeTarget") {
+        CanvasBasedWindow("Lajlas Vinkällar", "ComposeTarget") {
             App()
         }
     }

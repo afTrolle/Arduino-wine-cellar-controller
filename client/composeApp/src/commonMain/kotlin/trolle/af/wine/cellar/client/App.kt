@@ -57,7 +57,7 @@ import trolle.af.wine.cellar.client.theme.AppTheme
 internal fun App() = AppTheme {
 
     var climate: Weather? by remember { mutableStateOf(null) }
-    var error by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf(false) }
 
     val url = "192.168.1.117"
 
@@ -169,8 +169,9 @@ private fun MainScreenLayout(
                         """
                         Något har gått snett, Försök följande steg:
                         1. Kolla att du är kopplad till "Villa Trolle" WIFI
+                        1. See till och använda http och inte https i url:en
                         2. Starta om dossan i källaren genom att koppla ur nätverks sladden i propskåpet
-                        3. Ring Alex / Kolla router inställningarna ifall dossan dycker up.
+                        3. Ring Alex / Kolla router inställningarna ifall dossan dycker up
                     """.trimIndent()
                     )
                 },

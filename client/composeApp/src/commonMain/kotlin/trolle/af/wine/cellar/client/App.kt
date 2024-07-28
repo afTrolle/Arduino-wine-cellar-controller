@@ -123,7 +123,7 @@ private fun MainScreenLayout(
     topBar = {
         CenterAlignedTopAppBar(
             title = {
-                Text("Lajlas Vinkällar")
+                Text("Lajlas Vinkällare")
             },
         )
     }

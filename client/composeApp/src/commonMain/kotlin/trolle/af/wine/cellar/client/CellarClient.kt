@@ -11,19 +11,11 @@ import io.ktor.client.request.url
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 
+expect fun getClient(): HttpClient
+
 internal object CellarClient {
 
-    private val client = HttpClient {
-        expectSuccess = true
-        install(HttpTimeout) {
-            socketTimeoutMillis = 500
-            connectTimeoutMillis = 500
-            requestTimeoutMillis = 500
-        }
-        install(ContentNegotiation) {
-            json()
-        }
-    }
+     val client = getClient()
 
     internal suspend fun getWeather(url: String?) =
         url?.let {

@@ -9,7 +9,7 @@ plugins {
 
 kotlin {
     js {
-        moduleName = "composeApp"
+        outputModuleName.set("composeApp")
         browser {
             commonWebpackConfig {
                 outputFileName = "composeApp.js"
@@ -36,6 +36,10 @@ kotlin {
     }
 
     sourceSets {
+        appleMain.dependencies {
+            implementation(libs.ktor.client.darwin)
+        }
+
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)

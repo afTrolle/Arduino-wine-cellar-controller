@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CancellationException
@@ -277,6 +278,14 @@ private fun WineControls(
                 whilePressed = whileClose
             )
         }
+
+        Spacer(Modifier.height(16.dp))
+        Text(
+            modifier = Modifier.fillMaxWidth(),
+            text = "Se till att ingen är nära luckan",
+            fontStyle = FontStyle.Italic,
+            style = MaterialTheme.typography.labelSmall
+        )
     }
 }
 
